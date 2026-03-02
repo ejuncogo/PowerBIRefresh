@@ -40,10 +40,10 @@ def refresh_dataset():
     return response.status_code, response.text
 
 
-# Obtener último refresh de forma segura
+# Obtener último refresh completado
 def last_refresh_time():
     token = get_token()
-    url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/refreshes?$top=1"
+    url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/refreshes?$top=10"
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
@@ -52,29 +52,28 @@ def last_refresh_time():
     response.raise_for_status()
     data = response.json()
 
+    # Buscar el último refresh que ya terminó
     if "value" in data and len(data["value"]) > 0:
-        last_refresh = data["value"][0]
-        status = last_refresh.get("status", "Unknown")
+        for r in data["value"]:
+            end_time_str = r.get("endTime")
+            if end_time_str:  # Solo si ya terminó
+                status = r.get("status", "Unknown")
+                end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
+                diff = datetime.now(timezone.utc) - end_time
+                minutes = int(diff.total_seconds() / 60)
+                if minutes < 1:
+                    ago = "Hace menos de un minuto"
+                elif minutes < 60:
+                    ago = f"Hace {minutes} minutos"
+                else:
+                    hours = minutes // 60
+                    ago = f"Hace {hours} horas" if hours < 24 else f"Hace {hours//24} días"
+                
+                return end_time_str, status, ago
 
-        # Solo usar endTime si existe
-        end_time_str = last_refresh.get("endTime")
-        if end_time_str:
-            end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
-            diff = datetime.now(timezone.utc) - end_time
-            minutes = int(diff.total_seconds() / 60)
-            if minutes < 1:
-                ago = "Hace menos de un minuto"
-            elif minutes < 60:
-                ago = f"Hace {minutes} minutos"
-            else:
-                hours = minutes // 60
-                ago = f"Hace {hours} horas" if hours < 24 else f"Hace {hours//24} días"
-        else:
-            end_time_str = None
-            ago = "Refresh en curso..."
-
-        return end_time_str, status, ago
-
+        # Si ninguno terminó
+        return None, "Running", "Refresh en curso..."
+    
     return None, None, None
 
 
@@ -88,7 +87,7 @@ def trigger_refresh():
         # Disparar refresh
         status, text = refresh_dataset()
 
-        # Obtener info del último refresh
+        # Obtener info del último refresh completado
         last_time, last_status, last_ago = last_refresh_time()
 
         return jsonify({
