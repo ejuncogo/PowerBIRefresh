@@ -40,7 +40,7 @@ def refresh_dataset():
     return response.status_code, response.text
 
 
-# Obtener último refresh
+# Obtener último refresh de forma segura
 def last_refresh_time():
     token = get_token()
     url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/refreshes?$top=1"
@@ -51,25 +51,30 @@ def last_refresh_time():
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     data = response.json()
+
     if "value" in data and len(data["value"]) > 0:
         last_refresh = data["value"][0]
-        end_time_str = last_refresh["endTime"]
-        status = last_refresh["status"]
-        
-        # Convertir a datetime
-        end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
-        # Calcular diferencia con ahora
-        diff = datetime.now(timezone.utc) - end_time
-        minutes = int(diff.total_seconds() / 60)
-        if minutes < 1:
-            ago = "Hace menos de un minuto"
-        elif minutes < 60:
-            ago = f"Hace {minutes} minutos"
+        status = last_refresh.get("status", "Unknown")
+
+        # Solo usar endTime si existe
+        end_time_str = last_refresh.get("endTime")
+        if end_time_str:
+            end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
+            diff = datetime.now(timezone.utc) - end_time
+            minutes = int(diff.total_seconds() / 60)
+            if minutes < 1:
+                ago = "Hace menos de un minuto"
+            elif minutes < 60:
+                ago = f"Hace {minutes} minutos"
+            else:
+                hours = minutes // 60
+                ago = f"Hace {hours} horas" if hours < 24 else f"Hace {hours//24} días"
         else:
-            hours = minutes // 60
-            ago = f"Hace {hours} horas" if hours < 24 else f"Hace {hours//24} días"
-        
+            end_time_str = None
+            ago = "Refresh en curso..."
+
         return end_time_str, status, ago
+
     return None, None, None
 
 
