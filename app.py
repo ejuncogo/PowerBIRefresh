@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request
 import requests
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
 
@@ -40,7 +40,7 @@ def refresh_dataset():
     return response.status_code, response.text
 
 
-# Obtener último refresh completado
+# Obtener último refresh completado (UTC-5)
 def last_refresh_time():
     token = get_token()
     url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/refreshes?$top=10"
@@ -48,19 +48,27 @@ def last_refresh_time():
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
+
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     data = response.json()
 
-    # Buscar el último refresh que ya terminó
     if "value" in data and len(data["value"]) > 0:
         for r in data["value"]:
             end_time_str = r.get("endTime")
-            if end_time_str:  # Solo si ya terminó
+            if end_time_str:
                 status = r.get("status", "Unknown")
-                end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
-                diff = datetime.now(timezone.utc) - end_time
+
+                # Convertir a datetime UTC
+                end_time_utc = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
+
+                # Ajustar a UTC-5
+                end_time_local = end_time_utc - timedelta(hours=5)
+
+                # Calcular tiempo transcurrido
+                diff = datetime.now(timezone.utc) - end_time_utc
                 minutes = int(diff.total_seconds() / 60)
+
                 if minutes < 1:
                     ago = "Hace menos de un minuto"
                 elif minutes < 60:
@@ -68,12 +76,11 @@ def last_refresh_time():
                 else:
                     hours = minutes // 60
                     ago = f"Hace {hours} horas" if hours < 24 else f"Hace {hours//24} días"
-                
-                return end_time_str, status, ago
 
-        # Si ninguno terminó
+                return end_time_local.strftime("%Y-%m-%d %H:%M:%S"), status, ago
+
         return None, "Running", "Refresh en curso..."
-    
+
     return None, None, None
 
 
@@ -85,22 +92,22 @@ def trigger_refresh():
 
     try:
         # Disparar refresh
-        status, text = refresh_dataset()
+        trigger_status, trigger_response = refresh_dataset()
 
-        # Obtener info del último refresh completado
+        # Obtener último refresh completado
         last_time, last_status, last_ago = last_refresh_time()
 
         return jsonify({
-            "trigger_status": status,
-            "trigger_response": text,
+            "trigger_status": trigger_status,
+            "trigger_response": trigger_response,
             "last_refresh_time": last_time,
             "last_refresh_status": last_status,
             "last_refresh_ago": last_ago
         })
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
-    # Render asigna el puerto automáticamente
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
