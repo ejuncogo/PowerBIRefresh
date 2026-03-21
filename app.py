@@ -68,22 +68,21 @@ def refresh_dataset():
 
     response = requests.post(url, headers=headers)
 
-    # 👇 Si Power BI devuelve 400 (ya en ejecución), lo convertimos
     if response.status_code == 400:
         return {
             "status": "in_progress",
-            "message": "Ya hay una actualizacion en curso"
+            "message": "⏳ Ya hay una actualización en curso"
         }
 
     if response.status_code in [200, 202]:
         return {
             "status": "started",
-            "message": "Actualización iniciada correctamente"
+            "message": "🚀 Actualización iniciada correctamente"
         }
 
     return {
         "status": "error",
-        "message": response.text
+        "message": f"❌ Error al iniciar actualización: {response.text}"
     }
 
 
@@ -126,13 +125,13 @@ def last_refresh_time():
                 return {
                     "time": end_time_local.strftime("%Y-%m-%d %H:%M:%S"),
                     "status": status,
-                    "ago": ago
+                    "ago": f"🕒 {ago}"
                 }
 
         return {
             "time": None,
             "status": "InProgress",
-            "ago": "Actualización en curso"
+            "ago": "⏳ Actualización en curso"
         }
 
     return {
@@ -152,21 +151,21 @@ def trigger_refresh():
     if API_KEY and key != API_KEY:
         return jsonify({
             "status": "error",
-            "message": "No autorizado"
+            "message": "🔒 No autorizado"
         }), 401
 
     try:
-        # 👇 Validar si ya hay actualización en curso
+        # 👇 Si ya hay proceso corriendo
         if is_refresh_running():
             last = last_refresh_time()
 
             return jsonify({
                 "status": "in_progress",
-                "message": "Ya hay una actualización en curso",
+                "message": "⏳ Ya hay una actualización en curso",
                 "last_refresh": last
             }), 200
 
-        # 👇 Iniciar refresh
+        # 👇 Iniciar actualización
         result = refresh_dataset()
         last = last_refresh_time()
 
@@ -179,7 +178,7 @@ def trigger_refresh():
     except Exception as e:
         return jsonify({
             "status": "error",
-            "message": str(e)
+            "message": f"❌ Error interno: {str(e)}"
         }), 500
 
 
