@@ -14,7 +14,9 @@ DATASET_ID = os.getenv("DATASET_ID")
 API_KEY = os.getenv("API_KEY")
 
 
-# Obtener token de Power BI
+# =========================
+# 🔐 Obtener token
+# =========================
 def get_token():
     url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
     data = {
@@ -23,27 +25,75 @@ def get_token():
         "client_secret": CLIENT_SECRET,
         "scope": "https://analysis.windows.net/powerbi/api/.default"
     }
+
     response = requests.post(url, data=data)
     response.raise_for_status()
     return response.json()["access_token"]
 
 
-# Disparar refresh del dataset
-def refresh_dataset():
+# =========================
+# 🔍 Verificar si hay refresh corriendo
+# =========================
+def is_refresh_running():
     token = get_token()
-    url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/refreshes"
+    url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/refreshes?$top=1"
+
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
+
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    data = response.json()
+
+    if "value" in data and len(data["value"]) > 0:
+        status = data["value"][0].get("status", "")
+        return status in ["InProgress", "Unknown"]
+
+    return False
+
+
+# =========================
+# 🚀 Disparar refresh
+# =========================
+def refresh_dataset():
+    token = get_token()
+    url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/refreshes"
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
     response = requests.post(url, headers=headers)
-    return response.status_code, response.text
+
+    # 👇 Si Power BI devuelve 400 (ya en ejecución), lo convertimos
+    if response.status_code == 400:
+        return {
+            "status": "in_progress",
+            "message": "Ya hay una actualización en curso"
+        }
+
+    if response.status_code in [200, 202]:
+        return {
+            "status": "started",
+            "message": "Actualización iniciada correctamente"
+        }
+
+    return {
+        "status": "error",
+        "message": response.text
+    }
 
 
-# Obtener último refresh completado (UTC-5)
+# =========================
+# 📊 Último refresh
+# =========================
 def last_refresh_time():
     token = get_token()
     url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/refreshes?$top=10"
+
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
@@ -56,16 +106,12 @@ def last_refresh_time():
     if "value" in data and len(data["value"]) > 0:
         for r in data["value"]:
             end_time_str = r.get("endTime")
+            status = r.get("status", "Unknown")
+
             if end_time_str:
-                status = r.get("status", "Unknown")
-
-                # Convertir a datetime UTC
                 end_time_utc = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
-
-                # Ajustar a UTC-5
                 end_time_local = end_time_utc - timedelta(hours=5)
 
-                # Calcular tiempo transcurrido
                 diff = datetime.now(timezone.utc) - end_time_utc
                 minutes = int(diff.total_seconds() / 60)
 
@@ -77,37 +123,68 @@ def last_refresh_time():
                     hours = minutes // 60
                     ago = f"Hace {hours} horas" if hours < 24 else f"Hace {hours//24} días"
 
-                return end_time_local.strftime("%Y-%m-%d %H:%M:%S"), status, ago
+                return {
+                    "time": end_time_local.strftime("%Y-%m-%d %H:%M:%S"),
+                    "status": status,
+                    "ago": ago
+                }
 
-        return None, "Running", "Refresh en curso..."
+        return {
+            "time": None,
+            "status": "InProgress",
+            "ago": "Actualización en curso"
+        }
 
-    return None, None, None
+    return {
+        "time": None,
+        "status": None,
+        "ago": None
+    }
 
 
+# =========================
+# 🌐 Endpoint principal
+# =========================
 @app.route("/refresh", methods=["GET"])
 def trigger_refresh():
     key = request.args.get("key")
+
     if API_KEY and key != API_KEY:
-        return jsonify({"error": "No autorizado"}), 401
+        return jsonify({
+            "status": "error",
+            "message": "No autorizado"
+        }), 401
 
     try:
-        # Disparar refresh
-        trigger_status, trigger_response = refresh_dataset()
+        # 👇 Validar si ya hay actualización en curso
+        if is_refresh_running():
+            last = last_refresh_time()
 
-        # Obtener último refresh completado
-        last_time, last_status, last_ago = last_refresh_time()
+            return jsonify({
+                "status": "in_progress",
+                "message": "Ya hay una actualización en curso",
+                "last_refresh": last
+            }), 200
+
+        # 👇 Iniciar refresh
+        result = refresh_dataset()
+        last = last_refresh_time()
 
         return jsonify({
-            "trigger_status": trigger_status,
-            "trigger_response": trigger_response,
-            "last_refresh_time": last_time,
-            "last_refresh_status": last_status,
-            "last_refresh_ago": last_ago
-        })
+            "status": result["status"],
+            "message": result["message"],
+            "last_refresh": last
+        }), 200
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 
+# =========================
+# ▶️ Run
+# =========================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
