@@ -72,7 +72,7 @@ def refresh_dataset():
     if response.status_code == 400:
         return {
             "status": "in_progress",
-            "message": "Ya hay una actualización en curso"
+            "message": "Ya hay una actualizacion en curso"
         }
 
     if response.status_code in [200, 202]:
