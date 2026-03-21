@@ -161,7 +161,7 @@ def trigger_refresh():
 
             return jsonify({
                 "status": "in_progress",
-                "message": "⏳ Ya hay una actualización en curso",
+                "message": "⏳ Ya hay una actualizacion en curso",
                 "last_refresh": last
             }), 200
 
