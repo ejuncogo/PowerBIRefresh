@@ -71,18 +71,18 @@ def refresh_dataset():
     if response.status_code == 400:
         return {
             "status": "in_progress",
-            "message": "⏳ Ya hay una actualización en curso"
+            "message": "Ya hay una actualizacion en curso"
         }
 
     if response.status_code in [200, 202]:
         return {
             "status": "started",
-            "message": "🚀 Actualización iniciada correctamente"
+            "message": " Actualizacion iniciada correctamente"
         }
 
     return {
         "status": "error",
-        "message": f"❌ Error al iniciar actualización: {response.text}"
+        "message": f"Error al iniciar actualizacion: {response.text}"
     }
 
 
@@ -125,13 +125,13 @@ def last_refresh_time():
                 return {
                     "time": end_time_local.strftime("%Y-%m-%d %H:%M:%S"),
                     "status": status,
-                    "ago": f"🕒 {ago}"
+                    "ago": f" {ago}"
                 }
 
         return {
             "time": None,
             "status": "InProgress",
-            "ago": "⏳ Actualización en curso"
+            "ago": "Actualizacion en curso"
         }
 
     return {
@@ -151,7 +151,7 @@ def trigger_refresh():
     if API_KEY and key != API_KEY:
         return jsonify({
             "status": "error",
-            "message": "🔒 No autorizado"
+            "message": " No autorizado"
         }), 401
 
     try:
@@ -178,7 +178,7 @@ def trigger_refresh():
     except Exception as e:
         return jsonify({
             "status": "error",
-            "message": f"❌ Error interno: {str(e)}"
+            "message": f"Error interno: {str(e)}"
         }), 500
 
 
