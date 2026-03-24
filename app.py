@@ -77,7 +77,7 @@ def refresh_dataset():
     if response.status_code in [200, 202]:
         return {
             "status": "started",
-            "message": "Actualizacion iniciada correctamente"
+            "message": " Actualizacion iniciada correctamente"
         }
 
     return {
@@ -87,7 +87,7 @@ def refresh_dataset():
 
 
 # =========================
-# 📊 Último refresh (MEJORADO)
+# 📊 Último refresh (MODIFICADO)
 # =========================
 def last_refresh_time():
     token = get_token()
@@ -111,8 +111,7 @@ def last_refresh_time():
                 end_time_utc = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
                 end_time_local = end_time_utc - timedelta(hours=5)
 
-                now_utc = datetime.now(timezone.utc)
-                diff = now_utc - end_time_utc
+                diff = datetime.now(timezone.utc) - end_time_utc
                 minutes = int(diff.total_seconds() / 60)
 
                 return {
@@ -150,7 +149,7 @@ def trigger_refresh():
     if API_KEY and key != API_KEY:
         return jsonify({
             "status": "error",
-            "message": "No autorizado"
+            "message": " No autorizado"
         }), 401
 
     try:
@@ -162,7 +161,7 @@ def trigger_refresh():
 
             return jsonify({
                 "status": "in_progress",
-                "message": "Ya hay una actualizacion en curso",
+                "message": "⏳ Ya hay una actualizacion en curso",
                 "api_time_utc": api_time,
                 "last_refresh": last
             }), 200
