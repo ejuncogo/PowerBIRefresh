@@ -5,7 +5,9 @@ from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
 
+# =========================
 # Variables de entorno
+# =========================
 TENANT_ID = os.getenv("TENANT_ID")
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
@@ -13,16 +15,16 @@ WORKSPACE_ID = os.getenv("WORKSPACE_ID")
 DATASET_ID = os.getenv("DATASET_ID")
 API_KEY = os.getenv("API_KEY")
 
-
 # =========================
 # 🔐 Obtener token
 # =========================
 def get_token():
     url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
+
     data = {
         "grant_type": "client_credentials",
         "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET",
+        "client_secret": CLIENT_SECRET,
         "scope": "https://analysis.windows.net/powerbi/api/.default"
     }
 
@@ -30,12 +32,12 @@ def get_token():
     response.raise_for_status()
     return response.json()["access_token"]
 
-
 # =========================
 # 🔍 Verificar si hay refresh corriendo
 # =========================
 def is_refresh_running():
     token = get_token()
+
     url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/refreshes?$top=1"
 
     headers = {
@@ -53,12 +55,12 @@ def is_refresh_running():
 
     return False
 
-
 # =========================
 # 🚀 Disparar refresh
 # =========================
 def refresh_dataset():
     token = get_token()
+
     url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/refreshes"
 
     headers = {
@@ -77,7 +79,7 @@ def refresh_dataset():
     if response.status_code in [200, 202]:
         return {
             "status": "started",
-            "message": " Actualizacion iniciada correctamente"
+            "message": "Actualizacion iniciada correctamente"
         }
 
     return {
@@ -85,12 +87,12 @@ def refresh_dataset():
         "message": f"Error al iniciar actualizacion: {response.text}"
     }
 
-
 # =========================
-# 📊 Último refresh (MODIFICADO)
+# 📊 Último refresh (SOLO FECHA)
 # =========================
 def last_refresh_time():
     token = get_token()
+
     url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/refreshes?$top=10"
 
     headers = {
@@ -105,39 +107,20 @@ def last_refresh_time():
     if "value" in data and len(data["value"]) > 0:
         for r in data["value"]:
             end_time_str = r.get("endTime")
-            status = r.get("status", "Unknown")
 
             if end_time_str:
                 end_time_utc = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
+
+                # Ajuste a hora local (Colombia UTC-5)
                 end_time_local = end_time_utc - timedelta(hours=5)
 
-                diff = datetime.now(timezone.utc) - end_time_utc
-                minutes = int(diff.total_seconds() / 60)
-
                 return {
-                    "refresh_end_utc": end_time_utc.isoformat(),
-                    "refresh_end_local": end_time_local.isoformat(),
-                    "refresh_end_local_str": end_time_local.strftime("%Y-%m-%d %H:%M:%S"),
-                    "status": status,
-                    "minutes_since_refresh": minutes
+                    "date": end_time_local.strftime("%Y-%m-%d")
                 }
 
-        return {
-            "refresh_end_utc": None,
-            "refresh_end_local": None,
-            "refresh_end_local_str": None,
-            "status": "InProgress",
-            "minutes_since_refresh": None
-        }
-
     return {
-        "refresh_end_utc": None,
-        "refresh_end_local": None,
-        "refresh_end_local_str": None,
-        "status": None,
-        "minutes_since_refresh": None
+        "date": None
     }
-
 
 # =========================
 # 🌐 Endpoint principal
@@ -149,20 +132,16 @@ def trigger_refresh():
     if API_KEY and key != API_KEY:
         return jsonify({
             "status": "error",
-            "message": " No autorizado"
+            "message": "No autorizado"
         }), 401
 
     try:
-        api_time = datetime.now(timezone.utc).isoformat()
-
         # 👇 Si ya hay proceso corriendo
         if is_refresh_running():
             last = last_refresh_time()
-
             return jsonify({
                 "status": "in_progress",
-                "message": "⏳ Ya hay una actualizacion en curso",
-                "api_time_utc": api_time,
+                "message": "Ya hay una actualizacion en curso",
                 "last_refresh": last
             }), 200
 
@@ -173,7 +152,6 @@ def trigger_refresh():
         return jsonify({
             "status": result["status"],
             "message": result["message"],
-            "api_time_utc": api_time,
             "last_refresh": last
         }), 200
 
@@ -182,7 +160,6 @@ def trigger_refresh():
             "status": "error",
             "message": f"Error interno: {str(e)}"
         }), 500
-
 
 # =========================
 # ▶️ Run
