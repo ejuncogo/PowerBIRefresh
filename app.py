@@ -22,7 +22,7 @@ def get_token():
     data = {
         "grant_type": "client_credentials",
         "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
+        "client_secret": CLIENT_SECRET",
         "scope": "https://analysis.windows.net/powerbi/api/.default"
     }
 
@@ -77,7 +77,7 @@ def refresh_dataset():
     if response.status_code in [200, 202]:
         return {
             "status": "started",
-            "message": " Actualizacion iniciada correctamente"
+            "message": "Actualizacion iniciada correctamente"
         }
 
     return {
@@ -87,7 +87,7 @@ def refresh_dataset():
 
 
 # =========================
-# 📊 Último refresh
+# 📊 Último refresh (MEJORADO)
 # =========================
 def last_refresh_time():
     token = get_token()
@@ -111,33 +111,32 @@ def last_refresh_time():
                 end_time_utc = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
                 end_time_local = end_time_utc - timedelta(hours=5)
 
-                diff = datetime.now(timezone.utc) - end_time_utc
+                now_utc = datetime.now(timezone.utc)
+                diff = now_utc - end_time_utc
                 minutes = int(diff.total_seconds() / 60)
 
-                if minutes < 1:
-                    ago = "Hace menos de un minuto"
-                elif minutes < 60:
-                    ago = f"Hace {minutes} minutos"
-                else:
-                    hours = minutes // 60
-                    ago = f"Hace {hours} horas" if hours < 24 else f"Hace {hours//24} días"
-
                 return {
-                    "time": end_time_local.strftime("%Y-%m-%d %H:%M:%S"),
+                    "refresh_end_utc": end_time_utc.isoformat(),
+                    "refresh_end_local": end_time_local.isoformat(),
+                    "refresh_end_local_str": end_time_local.strftime("%Y-%m-%d %H:%M:%S"),
                     "status": status,
-                    "ago": f" {ago}"
+                    "minutes_since_refresh": minutes
                 }
 
         return {
-            "time": None,
+            "refresh_end_utc": None,
+            "refresh_end_local": None,
+            "refresh_end_local_str": None,
             "status": "InProgress",
-            "ago": "Actualizacion en curso"
+            "minutes_since_refresh": None
         }
 
     return {
-        "time": None,
+        "refresh_end_utc": None,
+        "refresh_end_local": None,
+        "refresh_end_local_str": None,
         "status": None,
-        "ago": None
+        "minutes_since_refresh": None
     }
 
 
@@ -151,17 +150,20 @@ def trigger_refresh():
     if API_KEY and key != API_KEY:
         return jsonify({
             "status": "error",
-            "message": " No autorizado"
+            "message": "No autorizado"
         }), 401
 
     try:
+        api_time = datetime.now(timezone.utc).isoformat()
+
         # 👇 Si ya hay proceso corriendo
         if is_refresh_running():
             last = last_refresh_time()
 
             return jsonify({
                 "status": "in_progress",
-                "message": "⏳ Ya hay una actualizacion en curso",
+                "message": "Ya hay una actualizacion en curso",
+                "api_time_utc": api_time,
                 "last_refresh": last
             }), 200
 
@@ -172,6 +174,7 @@ def trigger_refresh():
         return jsonify({
             "status": result["status"],
             "message": result["message"],
+            "api_time_utc": api_time,
             "last_refresh": last
         }), 200
 
