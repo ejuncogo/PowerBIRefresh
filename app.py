@@ -88,7 +88,7 @@ def refresh_dataset():
     }
 
 # =========================
-# 📊 Último refresh (solo fecha y hora)
+# 📊 Último refresh (ISO DateTime)
 # =========================
 def last_refresh_time():
     token = get_token()
@@ -114,8 +114,8 @@ def last_refresh_time():
                 # Ajuste a hora local (Colombia UTC-5)
                 end_time_local = end_time_utc - timedelta(hours=5)
 
-                # Solo devolver fecha y hora
-                return end_time_local.strftime("%Y-%m-%d %H:%M:%S")
+                # 🔥 FORMATO ISO (Power BI friendly)
+                return end_time_local.isoformat()
 
     return None
 
