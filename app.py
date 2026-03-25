@@ -88,7 +88,7 @@ def refresh_dataset():
     }
 
 # =========================
-# 📊 Último refresh (ISO DateTime)
+# 📊 Último refresh (formato limpio)
 # =========================
 def last_refresh_time():
     token = get_token()
@@ -109,13 +109,14 @@ def last_refresh_time():
             end_time_str = r.get("endTime")
 
             if end_time_str:
-                end_time_utc = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
+                # Convertir sin zona horaria problemática
+                end_time_utc = datetime.fromisoformat(end_time_str.replace("Z", ""))
 
-                # Ajuste a hora local (Colombia UTC-5)
+                # Ajuste a Colombia (UTC-5)
                 end_time_local = end_time_utc - timedelta(hours=5)
 
-                # 🔥 FORMATO ISO (Power BI friendly)
-                return end_time_local.isoformat()
+                # 🔥 FORMATO PERFECTO PARA POWER BI
+                return end_time_local.strftime("%Y-%m-%d %H:%M:%S")
 
     return None
 
@@ -133,7 +134,7 @@ def trigger_refresh():
         }), 401
 
     try:
-        # 👇 Si ya hay proceso corriendo
+        # Si ya hay refresh corriendo
         if is_refresh_running():
             last = last_refresh_time()
             return jsonify({
@@ -142,7 +143,7 @@ def trigger_refresh():
                 "last_refresh": last
             }), 200
 
-        # 👇 Iniciar actualización
+        # Iniciar refresh
         result = refresh_dataset()
         last = last_refresh_time()
 
