@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request
 import requests
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -88,7 +88,7 @@ def refresh_dataset():
     }
 
 # =========================
-# 📊 Último refresh (FECHA Y HORA)
+# 📊 Último refresh (solo fecha y hora)
 # =========================
 def last_refresh_time():
     token = get_token()
@@ -114,17 +114,10 @@ def last_refresh_time():
                 # Ajuste a hora local (Colombia UTC-5)
                 end_time_local = end_time_utc - timedelta(hours=5)
 
-                return {
-                    "datetime": end_time_local.strftime("%Y-%m-%d %H:%M:%S"),
-                    "date": end_time_local.strftime("%Y-%m-%d"),
-                    "time": end_time_local.strftime("%H:%M:%S")
-                }
+                # Solo devolver fecha y hora
+                return end_time_local.strftime("%Y-%m-%d %H:%M:%S")
 
-    return {
-        "datetime": None,
-        "date": None,
-        "time": None
-    }
+    return None
 
 # =========================
 # 🌐 Endpoint principal
