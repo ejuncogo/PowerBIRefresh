@@ -88,7 +88,7 @@ def refresh_dataset():
     }
 
 # =========================
-# 📊 Último refresh (SOLO FECHA)
+# 📊 Último refresh (FECHA Y HORA)
 # =========================
 def last_refresh_time():
     token = get_token()
@@ -115,11 +115,15 @@ def last_refresh_time():
                 end_time_local = end_time_utc - timedelta(hours=5)
 
                 return {
-                    "date": end_time_local.strftime("%Y-%m-%d")
+                    "datetime": end_time_local.strftime("%Y-%m-%d %H:%M:%S"),
+                    "date": end_time_local.strftime("%Y-%m-%d"),
+                    "time": end_time_local.strftime("%H:%M:%S")
                 }
 
     return {
-        "date": None
+        "datetime": None,
+        "date": None,
+        "time": None
     }
 
 # =========================
